@@ -11,6 +11,10 @@ A powerful and user-friendly application for backing up and restoring files and 
 - Dark mode support
 - Progress tracking and logging
 
+## To-Do
+- Fix Dark Mode
+- Fix Prog Bar Length
+
 ## Installation
 
 1. Clone the repository
