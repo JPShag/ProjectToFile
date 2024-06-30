@@ -1,6 +1,6 @@
 # Advanced Backup and Restore Application
 
-A powerful and user-friendly application for backing up and restoring files and folders with a graphical user interface.
+A powerful and user-friendly application for backing up and restoring files and folders with a graphical user interface. Useful for AI.
 
 ## Features
 
