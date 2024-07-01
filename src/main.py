@@ -1,11 +1,11 @@
 from PyQt5.QtWidgets import QApplication
 import sys
-from gui import BackupApp
+from gui import BackupRestoreApp
 
 def main():
     app = QApplication(sys.argv)
-    backup_app = BackupApp()
-    backup_app.show()
+    window = BackupRestoreApp()
+    window.show()
     sys.exit(app.exec_())
 
 if __name__ == "__main__":

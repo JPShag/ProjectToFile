@@ -1,26 +1,23 @@
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QPushButton, QLabel, QListWidget, QProgressBar, 
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QPushButton, QLabel, QListWidget, QProgressBar,
                              QFileDialog, QMessageBox, QCheckBox, QTabWidget,
-                             QTextEdit, QSplitter)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QPalette, QColor
-from backup import BackupThread
+                             QTextEdit, QSplitter, QFrame)
+from PyQt5.QtCore import Qt
+from backup import BackupHandler
 from restore import RestoreThread
-import os
 
-class BackupApp(QMainWindow):
+class BackupRestoreApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Advanced Backup and Restore Application")
+        self.setWindowTitle("Backup and Restore Application")
         self.setGeometry(100, 100, 800, 600)
         self.files = []
         self.setup_ui()
-        self.setup_dark_mode()
 
     def setup_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(central_widget)
 
         # Create tabs
         self.tabs = QTabWidget()
@@ -30,109 +27,95 @@ class BackupApp(QMainWindow):
         self.tabs.addTab(self.restore_tab, "Restore")
         layout.addWidget(self.tabs)
 
-        # Backup tab
-        backup_layout = QVBoxLayout()
-        splitter = QSplitter(Qt.Vertical)
-        top_widget = QWidget()
-        top_layout = QVBoxLayout()
+        # Setup Backup Tab
+        self.setup_backup_tab()
 
+        # Setup Restore Tab
+        self.setup_restore_tab()
+
+    def setup_backup_tab(self):
+        backup_layout = QVBoxLayout(self.backup_tab)
+
+        # File selection area
+        file_selection_layout = QVBoxLayout()
         self.file_list = QListWidget()
-        top_layout.addWidget(QLabel("Files to backup:"))
-        top_layout.addWidget(self.file_list)
+        file_selection_layout.addWidget(QLabel("Files and folders to backup:"))
+        file_selection_layout.addWidget(self.file_list)
 
-        btn_layout = QHBoxLayout()
-        self.add_btn = QPushButton("Add Files")
-        self.add_btn.clicked.connect(self.add_files)
+        file_btn_layout = QHBoxLayout()
+        self.add_file_btn = QPushButton("Add Files")
+        self.add_file_btn.clicked.connect(self.add_files)
         self.add_folder_btn = QPushButton("Add Folder")
         self.add_folder_btn.clicked.connect(self.add_folder)
-        self.clear_btn = QPushButton("Clear Files")
+        self.clear_btn = QPushButton("Clear Selection")
         self.clear_btn.clicked.connect(self.clear_files)
-        btn_layout.addWidget(self.add_btn)
-        btn_layout.addWidget(self.add_folder_btn)
-        btn_layout.addWidget(self.clear_btn)
-        top_layout.addLayout(btn_layout)
+        file_btn_layout.addWidget(self.add_file_btn)
+        file_btn_layout.addWidget(self.add_folder_btn)
+        file_btn_layout.addWidget(self.clear_btn)
+        file_selection_layout.addLayout(file_btn_layout)
 
+        # Backup options
         self.compress_cb = QCheckBox("Compress backup")
-        self.compress_cb.setChecked(True)
-        top_layout.addWidget(self.compress_cb)
-
         self.subdirs_cb = QCheckBox("Include subdirectories")
-        self.subdirs_cb.setChecked(True)
-        top_layout.addWidget(self.subdirs_cb)
-
+        options_layout = QHBoxLayout()
+        options_layout.addWidget(self.compress_cb)
+        options_layout.addWidget(self.subdirs_cb)
+        
+        # Backup control buttons
+        control_layout = QVBoxLayout()
         self.backup_btn = QPushButton("Start Backup")
         self.backup_btn.clicked.connect(self.start_backup)
-        top_layout.addWidget(self.backup_btn)
-
         self.backup_progress = QProgressBar()
-        self.backup_progress.setFixedHeight(20)  # Fix progress bar size
-        top_layout.addWidget(self.backup_progress)
+        self.backup_progress.setFixedHeight(20)
+        control_layout.addWidget(self.backup_btn)
+        control_layout.addWidget(self.backup_progress)
 
-        top_widget.setLayout(top_layout)
-        splitter.addWidget(top_widget)
-
+        # Backup log
         self.backup_log = QTextEdit()
         self.backup_log.setReadOnly(True)
-        splitter.addWidget(self.backup_log)
+        backup_log_layout = QVBoxLayout()
+        backup_log_layout.addWidget(QLabel("Backup Log:"))
+        backup_log_layout.addWidget(self.backup_log)
 
-        backup_layout.addWidget(splitter)
-        self.backup_tab.setLayout(backup_layout)
+        # Arrange all layouts
+        backup_layout.addLayout(file_selection_layout)
+        backup_layout.addLayout(options_layout)
+        backup_layout.addLayout(control_layout)
+        backup_layout.addLayout(backup_log_layout)
 
-        # Restore tab
-        restore_layout = QVBoxLayout()
+    def setup_restore_tab(self):
+        restore_layout = QVBoxLayout(self.restore_tab)
+
+        # Restore control buttons
+        control_layout = QVBoxLayout()
         self.restore_btn = QPushButton("Select Backup File and Restore")
         self.restore_btn.clicked.connect(self.start_restore)
-        restore_layout.addWidget(self.restore_btn)
-
         self.restore_progress = QProgressBar()
-        self.restore_progress.setFixedHeight(20)  # Fix progress bar size
-        restore_layout.addWidget(self.restore_progress)
+        self.restore_progress.setFixedHeight(20)
+        control_layout.addWidget(self.restore_btn)
+        control_layout.addWidget(self.restore_progress)
 
+        # Restore log
         self.restore_log = QTextEdit()
         self.restore_log.setReadOnly(True)
-        restore_layout.addWidget(self.restore_log)
+        restore_log_layout = QVBoxLayout()
+        restore_log_layout.addWidget(QLabel("Restore Log:"))
+        restore_log_layout.addWidget(self.restore_log)
 
-        self.restore_tab.setLayout(restore_layout)
-
-        central_widget.setLayout(layout)
-
-        # Add dark mode toggle
-        self.dark_mode_cb = QCheckBox("Dark Mode")
-        self.dark_mode_cb.stateChanged.connect(self.toggle_dark_mode)
-        layout.addWidget(self.dark_mode_cb)
-
-    def setup_dark_mode(self):
-        self.dark_palette = QPalette()
-        self.dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
-        self.dark_palette.setColor(QPalette.WindowText, Qt.white)
-        self.dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
-        self.dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        self.dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
-        self.dark_palette.setColor(QPalette.ToolTipText, Qt.white)
-        self.dark_palette.setColor(QPalette.Text, Qt.white)
-        self.dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
-        self.dark_palette.setColor(QPalette.ButtonText, Qt.white)
-        self.dark_palette.setColor(QPalette.BrightText, Qt.red)
-        self.dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
-        self.dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        self.dark_palette.setColor(QPalette.HighlightedText, Qt.black)
-
-        self.light_palette = self.style().standardPalette()
-
-    def toggle_dark_mode(self, state):
-        if state == Qt.Checked:
-            self.setPalette(self.dark_palette)
-        else:
-            self.setPalette(self.light_palette)
+        # Arrange all layouts
+        restore_layout.addLayout(control_layout)
+        restore_layout.addLayout(restore_log_layout)
 
     def add_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Select files to backup")
-        self.files.extend(files)
-        self.file_list.addItems(files)
+        for file in files:
+            if file not in self.files:
+                self.files.append(file)
+                self.file_list.addItem(file)
 
     def add_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select folder to backup")
-        if folder:
+        if folder and folder not in self.files:
             self.files.append(folder)
             self.file_list.addItem(folder)
 
@@ -150,9 +133,9 @@ class BackupApp(QMainWindow):
         if not backup_path:
             return
 
-        self.backup_thread = BackupThread(self.files, backup_path, 
-                                          self.compress_cb.isChecked(),
-                                          self.subdirs_cb.isChecked())
+        self.backup_thread = BackupHandler(self.files, backup_path, 
+                                           self.compress_cb.isChecked(),
+                                           self.subdirs_cb.isChecked())
         self.backup_thread.progress_updated.connect(self.update_backup_progress)
         self.backup_thread.file_processed.connect(self.log_backup_progress)
         self.backup_thread.backup_completed.connect(self.backup_completed)

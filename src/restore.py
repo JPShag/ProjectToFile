@@ -40,19 +40,23 @@ class RestoreThread(QThread):
 
     def restore_uncompressed(self):
         try:
-            total_size = sum(get_file_size(os.path.join(root, file))
-                             for root, _, files in os.walk(self.backup_file)
-                             for file in files)
+            with open(self.backup_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            files = content.split('\n\n')
+            total_size = sum(len(file) for file in files)
             processed_size = 0
-            for root, _, files in os.walk(self.backup_file):
-                for file in files:
-                    src_path = os.path.join(root, file)
-                    dst_path = os.path.join(self.restore_dir, os.path.relpath(src_path, self.backup_file))
-                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                    shutil.copy2(src_path, dst_path)
-                    file_size = get_file_size(src_path)
+
+            for file in files:
+                if file.strip():
+                    header, data = file.split('\n', 1)
+                    file_path = header.strip("--- ").strip()
+                    restore_path = os.path.join(self.restore_dir, os.path.relpath(file_path))
+                    os.makedirs(os.path.dirname(restore_path), exist_ok=True)
+                    with open(restore_path, 'w', encoding='utf-8') as out_file:
+                        out_file.write(data)
+                    file_size = len(data)
                     processed_size += file_size
                     self.progress_updated.emit(int(processed_size / total_size * 100))
-                    self.file_processed.emit(f"{dst_path} ({format_size(file_size)})")
+                    self.file_processed.emit(f"{restore_path} ({format_size(file_size)})")
         except Exception as e:
             self.restore_failed.emit(f"Failed to restore uncompressed: {str(e)}")
