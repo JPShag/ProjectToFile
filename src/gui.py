@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QListWidget, QProgressBar, 
                              QFileDialog, QMessageBox, QCheckBox, QTabWidget,
-                             QTextEdit, QSplitter, QStyle, QStyleFactory)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt5.QtGui import QIcon, QPalette, QColor
+                             QTextEdit, QSplitter)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QPalette, QColor
 from backup import BackupThread
 from restore import RestoreThread
 import os
@@ -32,12 +32,10 @@ class BackupApp(QMainWindow):
 
         # Backup tab
         backup_layout = QVBoxLayout()
-        
         splitter = QSplitter(Qt.Vertical)
-        
         top_widget = QWidget()
         top_layout = QVBoxLayout()
-        
+
         self.file_list = QListWidget()
         top_layout.addWidget(QLabel("Files to backup:"))
         top_layout.addWidget(self.file_list)

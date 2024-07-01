@@ -21,7 +21,7 @@ def count_files_in_directory(directory, include_subdirs=True):
     Count the number of files in a directory.
     """
     count = 0
-    for root, dirs, files in os.walk(directory):
+    for root, _, files in os.walk(directory):
         if not include_subdirs and root != directory:
             continue
         count += len(files)
@@ -34,7 +34,7 @@ def get_total_size(paths, include_subdirs=True):
     total_size = 0
     for path in paths:
         if os.path.isdir(path):
-            for root, dirs, files in os.walk(path):
+            for root, _, files in os.walk(path):
                 if not include_subdirs and root != path:
                     continue
                 total_size += sum(get_file_size(os.path.join(root, file)) for file in files)

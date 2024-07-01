@@ -28,58 +28,64 @@ class BackupThread(QThread):
             self.backup_failed.emit(str(e))
 
     def backup_compressed(self):
-        with zipfile.ZipFile(self.backup_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        try:
+            with zipfile.ZipFile(self.backup_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                total_size = self.get_total_size()
+                processed_size = 0
+                for item in self.files:
+                    if os.path.isdir(item):
+                        for root, _, files in os.walk(item):
+                            if not self.include_subdirs and root != item:
+                                continue
+                            for file in files:
+                                file_path = os.path.join(root, file)
+                                zf.write(file_path, os.path.relpath(file_path, os.path.dirname(item)))
+                                file_size = get_file_size(file_path)
+                                processed_size += file_size
+                                self.progress_updated.emit(int(processed_size / total_size * 100))
+                                self.file_processed.emit(f"{file_path} ({format_size(file_size)})")
+                    elif os.path.isfile(item):
+                        zf.write(item, os.path.basename(item))
+                        file_size = get_file_size(item)
+                        processed_size += file_size
+                        self.progress_updated.emit(int(processed_size / total_size * 100))
+                        self.file_processed.emit(f"{item} ({format_size(file_size)})")
+        except Exception as e:
+            self.backup_failed.emit(f"Failed to create compressed backup: {str(e)}")
+
+    def backup_uncompressed(self):
+        try:
             total_size = self.get_total_size()
             processed_size = 0
             for item in self.files:
                 if os.path.isdir(item):
-                    for root, dirs, files in os.walk(item):
+                    for root, _, files in os.walk(item):
                         if not self.include_subdirs and root != item:
                             continue
                         for file in files:
-                            file_path = os.path.join(root, file)
-                            zf.write(file_path, os.path.relpath(file_path, os.path.dirname(item)))
-                            file_size = get_file_size(file_path)
+                            src_path = os.path.join(root, file)
+                            dst_path = os.path.join(self.backup_path, os.path.relpath(src_path, os.path.dirname(item)))
+                            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                            shutil.copy2(src_path, dst_path)
+                            file_size = get_file_size(src_path)
                             processed_size += file_size
                             self.progress_updated.emit(int(processed_size / total_size * 100))
-                            self.file_processed.emit(f"{file_path} ({format_size(file_size)})")
+                            self.file_processed.emit(f"{src_path} ({format_size(file_size)})")
                 elif os.path.isfile(item):
-                    zf.write(item, os.path.basename(item))
+                    dst_path = os.path.join(self.backup_path, os.path.basename(item))
+                    shutil.copy2(item, dst_path)
                     file_size = get_file_size(item)
                     processed_size += file_size
                     self.progress_updated.emit(int(processed_size / total_size * 100))
                     self.file_processed.emit(f"{item} ({format_size(file_size)})")
-
-    def backup_uncompressed(self):
-        total_size = self.get_total_size()
-        processed_size = 0
-        for item in self.files:
-            if os.path.isdir(item):
-                for root, dirs, files in os.walk(item):
-                    if not self.include_subdirs and root != item:
-                        continue
-                    for file in files:
-                        src_path = os.path.join(root, file)
-                        dst_path = os.path.join(self.backup_path, os.path.relpath(src_path, os.path.dirname(item)))
-                        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                        shutil.copy2(src_path, dst_path)
-                        file_size = get_file_size(src_path)
-                        processed_size += file_size
-                        self.progress_updated.emit(int(processed_size / total_size * 100))
-                        self.file_processed.emit(f"{src_path} ({format_size(file_size)})")
-            elif os.path.isfile(item):
-                dst_path = os.path.join(self.backup_path, os.path.basename(item))
-                shutil.copy2(item, dst_path)
-                file_size = get_file_size(item)
-                processed_size += file_size
-                self.progress_updated.emit(int(processed_size / total_size * 100))
-                self.file_processed.emit(f"{item} ({format_size(file_size)})")
+        except Exception as e:
+            self.backup_failed.emit(f"Failed to create uncompressed backup: {str(e)}")
 
     def get_total_size(self):
         total_size = 0
         for item in self.files:
             if os.path.isdir(item):
-                for root, dirs, files in os.walk(item):
+                for root, _, files in os.walk(item):
                     if not self.include_subdirs and root != item:
                         continue
                     total_size += sum(get_file_size(os.path.join(root, file)) for file in files)
