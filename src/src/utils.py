@@ -1,43 +1,41 @@
-import os
+import schedule
+import time
+
+def schedule_backup(backup_handler, interval='daily'):
+    if interval == 'daily':
+        schedule.every().day.at("02:00").do(backup_handler.run)
+    elif interval == 'weekly':
+        schedule.every().monday.at("02:00").do(backup_handler.run)
+    elif interval == 'monthly':
+        schedule.every().month.at("02:00").do(backup_handler.run)
+
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 def get_file_size(file_path):
-    """
-    Get the size of a file in bytes.
-    """
     return os.path.getsize(file_path)
 
 def format_size(size_in_bytes):
-    """
-    Format file size in human-readable format.
-    """
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size_in_bytes < 1024.0:
             return f"{size_in_bytes:.2f} {unit}"
         size_in_bytes /= 1024.0
     return f"{size_in_bytes:.2f} PB"
 
-def count_files_in_directory(directory, include_subdirs=True):
-    """
-    Count the number of files in a directory.
-    """
-    count = 0
-    for root, _, files in os.walk(directory):
-        if not include_subdirs and root != directory:
-            continue
-        count += len(files)
-    return count
+def generate_file_tree(root_dir):
+    tree = {}
+    for root, dirs, files in os.walk(root_dir):
+        folder_tree = tree
+        for part in root.split(os.sep):
+            folder_tree = folder_tree.setdefault(part, {})
+        for file in files:
+            folder_tree[file] = None
+    return tree
 
-def get_total_size(paths, include_subdirs=True):
-    """
-    Get the total size of files and directories.
-    """
-    total_size = 0
-    for path in paths:
-        if os.path.isdir(path):
-            for root, _, files in os.walk(path):
-                if not include_subdirs and root != path:
-                    continue
-                total_size += sum(get_file_size(os.path.join(root, file)) for file in files)
-        elif os.path.isfile(path):
-            total_size += get_file_size(path)
-    return total_size
+def print_file_tree(tree, indent=0):
+    for key, value in tree.items():
+        print('  ' * indent + key)
+        if isinstance(value, dict):
+            print_file_tree(value, indent + 1)
