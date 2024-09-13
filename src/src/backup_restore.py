@@ -1,9 +1,9 @@
-from PyQt5.QtCore import QThread, pyqtSignal
 import os
 import logging
 import zipfile
 from datetime import datetime
 from cryptography.fernet import Fernet
+from PyQt5.QtCore import QThread, pyqtSignal
 from utils import format_size
 
 class BackupRestoreHandler(QThread):
@@ -24,8 +24,7 @@ class BackupRestoreHandler(QThread):
         self.include_subdirs = include_subdirs
         self.backup_file = backup_file
         self.encryption_key = encryption_key
-        logging.basicConfig(level=logging.INFO, filename='backup_restore.log',
-                            format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(level=logging.INFO, filename='backup_restore.log', format='%(asctime)s - %(levelname)s - %(message)s')
 
     def run(self):
         if self.action == 'backup':
@@ -44,7 +43,7 @@ class BackupRestoreHandler(QThread):
             logging.info(f"Backup completed successfully at {self.backup_path}")
             self.backup_completed.emit(self.backup_path)
         except Exception as e:
-            logging.error(f"Backup failed: {str(e)}")
+            logging.error(f"Backup failed: {e}", exc_info=True)
             self.backup_failed.emit(str(e))
 
     def _write_backup(self, f, encrypted):
@@ -52,30 +51,33 @@ class BackupRestoreHandler(QThread):
         total_size = self.get_total_size()
         processed_size = 0
 
-        if encrypted:
-            fernet = Fernet(self.encryption_key)
-            f.write(fernet.encrypt(f"Backup created on {timestamp}\n\n".encode('utf-8')))
-        else:
-            f.write(f"Backup created on {timestamp}\n\n")
+        try:
+            if encrypted:
+                fernet = Fernet(self.encryption_key)
+                f.write(fernet.encrypt(f"Backup created on {timestamp}\n\n".encode('utf-8')))
+            else:
+                f.write(f"Backup created on {timestamp}\n\n")
 
-        for item in self.files:
-            if os.path.isdir(item):
-                for root, _, files in os.walk(item):
-                    if not self.include_subdirs and root != item:
-                        continue
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        self._write_file(f, file_path, encrypted)
-                        file_size = os.path.getsize(file_path)
-                        processed_size += file_size
-                        self.progress_updated.emit(int(processed_size / total_size * 100))
-                        self.file_processed.emit(f"{file_path} ({format_size(file_size)})")
-            elif os.path.isfile(item):
-                self._write_file(f, item, encrypted)
-                file_size = os.path.getsize(item)
-                processed_size += file_size
-                self.progress_updated.emit(int(processed_size / total_size * 100))
-                self.file_processed.emit(f"{item} ({format_size(file_size)})")
+            for item in self.files:
+                if os.path.isdir(item):
+                    for root, _, files in os.walk(item):
+                        if not self.include_subdirs and root != item:
+                            continue
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            self._write_file(f, file_path, encrypted)
+                            file_size = os.path.getsize(file_path)
+                            processed_size += file_size
+                            self.progress_updated.emit(int(processed_size / total_size * 100))
+                            self.file_processed.emit(f"{file_path} ({format_size(file_size)})")
+                elif os.path.isfile(item):
+                    self._write_file(f, item, encrypted)
+                    file_size = os.path.getsize(item)
+                    processed_size += file_size
+                    self.progress_updated.emit(int(processed_size / total_size * 100))
+                    self.file_processed.emit(f"{item} ({format_size(file_size)})")
+        except Exception as e:
+            logging.error(f"Error during backup: {e}", exc_info=True)
 
     def _write_file(self, f, file_path, encrypted):
         header = f"--- {file_path} ---\n".encode('utf-8')
@@ -91,7 +93,7 @@ class BackupRestoreHandler(QThread):
                     f.write(content.decode('utf-8', errors='ignore'))
         except Exception as e:
             error_msg = f"Error reading file {file_path}: {str(e)}\n".encode('utf-8')
-            logging.error(f"Error reading file {file_path}: {str(e)}")
+            logging.error(f"Error reading file {file_path}: {e}", exc_info=True)
             if encrypted:
                 fernet = Fernet(self.encryption_key)
                 f.write(fernet.encrypt(error_msg))
@@ -118,6 +120,7 @@ class BackupRestoreHandler(QThread):
                 self.restore_uncompressed()
             self.restore_completed.emit()
         except Exception as e:
+            logging.error(f"Restore failed: {e}", exc_info=True)
             self.restore_failed.emit(str(e))
 
     def restore_from_zip(self):
@@ -131,6 +134,7 @@ class BackupRestoreHandler(QThread):
                     self.progress_updated.emit(int(processed_size / total_size * 100))
                     self.file_processed.emit(f"{os.path.join(self.restore_dir, info.filename)} ({format_size(info.file_size)})")
         except Exception as e:
+            logging.error(f"Failed to restore from zip: {e}", exc_info=True)
             self.restore_failed.emit(f"Failed to restore from zip: {str(e)}")
 
     def restore_uncompressed(self):
@@ -160,4 +164,5 @@ class BackupRestoreHandler(QThread):
                     self.progress_updated.emit(int(processed_size / total_size * 100))
                     self.file_processed.emit(f"{restore_path} ({format_size(file_size)})")
         except Exception as e:
+            logging.error(f"Failed to restore uncompressed: {e}", exc_info=True)
             self.restore_failed.emit(f"Failed to restore uncompressed: {str(e)}")
